@@ -1,0 +1,543 @@
+{
+  "name": "DOI Enrichment - Academic Lead Generation v2 FINAL",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Start Processing",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1B-TkMjnX4WWICNrNbQ8Cm3-lwYezUIAUCh4c18FH6ys/edit?gid=133940288#gid=133940288",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 133940288,
+          "mode": "list",
+          "cachedResultName": "DOI_Mock_Data"
+        },
+        "options": {}
+      },
+      "id": "read-input",
+      "name": "Read DOI List",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [450, 300],
+      "credentials": {
+        "googleApi": {
+          "id": "GC5KfB7DegeyruJC",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.Status }}",
+              "rightValue": "Pending",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-pending",
+      "name": "Filter Pending DOIs",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "loop-dois",
+      "name": "Loop Over DOIs",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.crossref.org/works/{{ $json.DOI }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "mailto:research@example.com"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "crossref-request",
+      "name": "Get CrossRef Metadata",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1050, 300],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.message !== undefined && $json.status === 'ok' }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-success",
+      "name": "Check API Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "DOI",
+              "value": "={{ $('Loop Over DOIs').item.json.DOI }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "Title",
+              "value": "={{ $json.message.title?.[0] || 'N/A' }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "Authors",
+              "value": "={{ $json.message.author?.map(a => (a.given || '') + ' ' + (a.family || '')).join('; ') || 'N/A' }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "First_Author_Name",
+              "value": "={{ ($json.message.author?.[0]?.given || '') + ' ' + ($json.message.author?.[0]?.family || '') }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "First_Author_Affiliation",
+              "value": "={{ $json.message.author?.[0]?.affiliation?.[0]?.name || 'N/A' }}",
+              "type": "string"
+            },
+            {
+              "id": "6",
+              "name": "First_Author_Email",
+              "value": "N/A",
+              "type": "string"
+            },
+            {
+              "id": "7",
+              "name": "First_Author_LinkedIn",
+              "value": "N/A",
+              "type": "string"
+            },
+            {
+              "id": "8",
+              "name": "Corresponding_Author_Name",
+              "value": "N/A",
+              "type": "string"
+            },
+            {
+              "id": "9",
+              "name": "Corresponding_Author_Email",
+              "value": "N/A",
+              "type": "string"
+            },
+            {
+              "id": "10",
+              "name": "Corresponding_Author_Affiliation",
+              "value": "N/A",
+              "type": "string"
+            },
+            {
+              "id": "11",
+              "name": "Publication_Date",
+              "value": "={{ $json.message.published?.['date-parts']?.[0]?.join('-') || 'N/A' }}",
+              "type": "string"
+            },
+            {
+              "id": "12",
+              "name": "Journal",
+              "value": "={{ $json.message['container-title']?.[0] || 'N/A' }}",
+              "type": "string"
+            },
+            {
+              "id": "13",
+              "name": "Keywords",
+              "value": "={{ $json.message.subject?.join(', ') || 'N/A' }}",
+              "type": "string"
+            },
+            {
+              "id": "14",
+              "name": "Open_Access",
+              "value": "={{ $json.message.license?.length > 0 ? 'Yes' : 'Unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "15",
+              "name": "Abstract",
+              "value": "={{ ($json.message.abstract || 'N/A').replace(/<[^>]*>/g, '').substring(0, 500) }}",
+              "type": "string"
+            },
+            {
+              "id": "16",
+              "name": "Status",
+              "value": "Success",
+              "type": "string"
+            },
+            {
+              "id": "17",
+              "name": "Processed_Date",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "format-success",
+      "name": "Format Success Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1450, 200]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "DOI",
+              "value": "={{ $('Loop Over DOIs').item.json.DOI }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "Title",
+              "value": "Failed to retrieve",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "Authors",
+              "value": "N/A",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "First_Author_Name",
+              "value": "N/A",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "First_Author_Affiliation",
+              "value": "N/A",
+              "type": "string"
+            },
+            {
+              "id": "6",
+              "name": "First_Author_Email",
+              "value": "N/A",
+              "type": "string"
+            },
+            {
+              "id": "7",
+              "name": "First_Author_LinkedIn",
+              "value": "N/A",
+              "type": "string"
+            },
+            {
+              "id": "8",
+              "name": "Corresponding_Author_Name",
+              "value": "N/A",
+              "type": "string"
+            },
+            {
+              "id": "9",
+              "name": "Corresponding_Author_Email",
+              "value": "N/A",
+              "type": "string"
+            },
+            {
+              "id": "10",
+              "name": "Corresponding_Author_Affiliation",
+              "value": "N/A",
+              "type": "string"
+            },
+            {
+              "id": "11",
+              "name": "Publication_Date",
+              "value": "N/A",
+              "type": "string"
+            },
+            {
+              "id": "12",
+              "name": "Journal",
+              "value": "N/A",
+              "type": "string"
+            },
+            {
+              "id": "13",
+              "name": "Keywords",
+              "value": "N/A",
+              "type": "string"
+            },
+            {
+              "id": "14",
+              "name": "Open_Access",
+              "value": "Unknown",
+              "type": "string"
+            },
+            {
+              "id": "15",
+              "name": "Abstract",
+              "value": "N/A",
+              "type": "string"
+            },
+            {
+              "id": "16",
+              "name": "Status",
+              "value": "Failed - DOI not found",
+              "type": "string"
+            },
+            {
+              "id": "17",
+              "name": "Processed_Date",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "format-failed",
+      "name": "Format Failed Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1450, 400]
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "mode": "id",
+          "value": "1B-TkMjnX4WWICNrNbQ8Cm3-lwYezUIAUCh4c18FH6ys"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1029705184,
+          "mode": "list",
+          "cachedResultName": "Sayfa1"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "write-output",
+      "name": "Append to Output Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [1650, 300],
+      "credentials": {
+        "googleApi": {
+          "id": "GC5KfB7DegeyruJC",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Wait 2 seconds for rate limiting\nawait new Promise(resolve => setTimeout(resolve, 2000));\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1850, 300],
+      "id": "rate-limit-delay",
+      "name": "Rate Limit Delay"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Start Processing": {
+      "main": [
+        [
+          {
+            "node": "Read DOI List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read DOI List": {
+      "main": [
+        [
+          {
+            "node": "Filter Pending DOIs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Pending DOIs": {
+      "main": [
+        [
+          {
+            "node": "Loop Over DOIs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over DOIs": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Get CrossRef Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get CrossRef Metadata": {
+      "main": [
+        [
+          {
+            "node": "Check API Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check API Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check API Success": {
+      "main": [
+        [
+          {
+            "node": "Format Success Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Failed Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Success Data": {
+      "main": [
+        [
+          {
+            "node": "Append to Output Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Failed Data": {
+      "main": [
+        [
+          {
+            "node": "Append to Output Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append to Output Sheet": {
+      "main": [
+        [
+          {
+            "node": "Rate Limit Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rate Limit Delay": {
+      "main": [
+        [
+          {
+            "node": "Loop Over DOIs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
